@@ -10,6 +10,6 @@ struct Care: ParsableCommand {
         
         Create a simple configuration file that is easy to maintain and host, yet provides important flexibility to specify settings based on your needs.
         """,
-        version: "0.0.2",
+        version: "0.0.3",
         subcommands: [Init.self, Verify.self, Resolve.self, Prepare.self])
 }
