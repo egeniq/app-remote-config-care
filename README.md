@@ -18,9 +18,9 @@ The JSON/YAML schema is defined [here](https://raw.githubusercontent.com/egeniq/
 
 ## Usage
 
-The `care` command line utility has built-in help available.
+The "care" command line utility has built-in help available.
 
-   care --help
+    care --help
    
 There are four subcommands to use: init, verify, resolve and prepare.
 
@@ -28,7 +28,7 @@ There are four subcommands to use: init, verify, resolve and prepare.
 
 Create a new configuration file:
 
-   care init appconfig.yaml
+    care init appconfig.yaml
    
 This will create a new file:
 
@@ -114,6 +114,6 @@ No further overrides scheduled.
 
 The last step is convert the config file to compact json.
 
-   care prepare appconfig.yaml appconfig.json
+    care prepare appconfig.yaml appconfig.json
 
 The file `appconfig.json` is now ready to made available to your app via a webserver.
