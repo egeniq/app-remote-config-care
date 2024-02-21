@@ -24,6 +24,7 @@ extension Care {
             switch kind {
             case .yaml:
                 let yaml = """
+                # yaml-language-server: $schema=https://raw.githubusercontent.com/egeniq/app-remote-config/main/Schema/appremoteconfig.schema.json
                 $schema: https://raw.githubusercontent.com/egeniq/app-remote-config/main/Schema/appremoteconfig.schema.json
                 
                 # Settings for the current app.

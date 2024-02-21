@@ -41,7 +41,7 @@ extension Care {
                 }
             }
            
-            let dataOut = try JSONSerialization.data(withJSONObject: object)
+            let dataOut = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
             let results = try Verify().verify(from: dataOut)
             if results.filter({ $0.level == .error }).isEmpty {
                 try dataOut.write(to: outputFile)
