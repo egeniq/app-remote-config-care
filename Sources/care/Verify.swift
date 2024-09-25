@@ -1,6 +1,9 @@
 import AppRemoteConfig
 import ArgumentParser
+import Dependencies
 import Foundation
+import SodiumClient
+import SodiumClientLive
 import Yams
 
 extension Care {
@@ -13,6 +16,10 @@ extension Care {
             completion: .file(extensions: ["yaml", "yml", "json"]), transform: URL.init(fileURLWithPath:))
         var inputFile: URL
         
+        @Option(help: "The public key used to sign the configuration.")
+        var publicKey: String?
+        
+        @MainActor
         mutating func run() throws {
             let data = try Data(contentsOf: inputFile)
             let results = try verify(from: data)
@@ -32,12 +39,25 @@ extension Care {
             }
         }
         
+        @MainActor
         func verify(from data: Data) throws -> [VerificationResult]  {
             var results = [VerificationResult]()
             
-            var object: [String: Any]
+            let object: [String: Any]
             
-            if let jsonObject = try? JSONSerialization.jsonObject(with: data, options: []) {
+            if let publicKey {
+                @Dependency(SodiumClient.self) var sodiumClient
+                guard let config = sodiumClient.open(signedMessage: data, publicKey: publicKey) else {
+                    throw ConfigError.invalidSignature
+                }
+                let jsonObject = try JSONSerialization.jsonObject(with: config, options: [])
+                if let jsonDict = jsonObject as? [String: Any] {
+                    object = jsonDict
+                } else {
+                    results.append(.init(level: .error, message: "Expected a dictionary with string keys.", keyPath: "/"))
+                    return results
+                }
+            } else if let jsonObject = try? JSONSerialization.jsonObject(with: data, options: []) {
                 if let jsonDict = jsonObject as? [String: Any] {
                     object = jsonDict
                 } else {
