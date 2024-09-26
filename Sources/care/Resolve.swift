@@ -45,17 +45,25 @@ extension Care {
         @Option(help: "The 2 character code of the language the app runs in.")
         var language: String?
         
+        @Option(help: "The public key used to sign the configuration.")
+        var publicKey: String?
+        
+        @MainActor
         mutating func run() throws {
             let data = try Data(contentsOf: inputFile)
-            var object: [String: Any]
-            
-            if let jsonObject = try? JSONSerialization.jsonObject(with: data, options: []) {
-                if let jsonDict = jsonObject as? [String: Any] {
-                    object = jsonDict
+            let config: Config
+           
+            if let _ = try? JSONSerialization.jsonObject(with: data, options: []) {
+                if let publicKey {
+                    config = try Config(data: data, publicKey: publicKey)
                 } else {
-                    throw CareError.unexpectedData
+                    config = try Config(data: data)
                 }
             } else {
+                if publicKey != nil {
+                    print("\("[WARNING]", effect: .yellow) Config is not signed, but a public key was provided.")
+                }
+                var object: [String: Any]
                 let string = String(data: data, encoding: .utf8)!
                 if let yamlObject = try? Yams.load(yaml: string) {
                     if let yamlDict = yamlObject as? [String: Any] {
@@ -66,8 +74,9 @@ extension Care {
                 } else {
                     throw CareError.unexpectedData
                 }
+                config = try Config(json: object)
             }
-            let config = try Config(json: object)
+            
             let parsedDate: Date
             if let date {
                 guard let date = ISO8601DateFormatter().date(from: date) else {

@@ -19,6 +19,7 @@ extension Care {
             completion: .file(extensions: ["yaml", "yml", "json"]), transform: URL.init(fileURLWithPath:))
         var outputFile: URL
         
+        @MainActor
         mutating func run() throws {
             // Just writing text to disk, so we can add some helpful comments
             switch kind {

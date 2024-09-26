@@ -1,6 +1,8 @@
 import AppRemoteConfig
 import ArgumentParser
+import Dependencies
 import Foundation
+import SodiumClient
 import Yams
 
 extension Care {
@@ -8,6 +10,11 @@ extension Care {
         static var configuration =
             CommandConfiguration(abstract: "Prepare a configuration for publication.")
 
+        @Option(
+            name: [.customShort("s"), .long],
+            help: "The secret key to use for signing the configuration.")
+        var secret: String?
+        
         @Argument(
             help: "The file that contains the configuration.",
             completion: .file(extensions: ["yaml", "yml", "json"]), transform: URL.init(fileURLWithPath:))
@@ -18,6 +25,7 @@ extension Care {
             completion: .file(extensions: ["json"]), transform: URL.init(fileURLWithPath:))
         var outputFile: URL
         
+        @MainActor
         mutating func run() throws {
             let data = try Data(contentsOf: inputFile)
             var object: [String: Any]
@@ -42,20 +50,21 @@ extension Care {
             }
            
             let dataOut = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
-            let results = try Verify().verify(from: dataOut)
-            if results.filter({ $0.level == .error }).isEmpty {
-                try dataOut.write(to: outputFile)
-                print("This configuration is \("prepared", effect: .green).")
-                results.forEach {
-                    print("\($0.level.text) \($0.message) - \($0.keyPath, effect: .faint)")
+            var results = [VerificationResult]()
+            if let secret {
+                @Dependency(\.sodiumClient) var sodiumClient
+                guard let signedData = sodiumClient.sign(message: dataOut, secretKey: secret) else {
+                    throw ConfigError.signingFailed
                 }
+                try signedData.write(to: outputFile)
             } else {
-                print("This configuration has \(results.count, effect: .bold) issue(s).")
-                results.forEach {
-                    print("\($0.level.text) \($0.message) - \($0.keyPath, effect: .faint)")
-                }
+                results.append(.init(level: .info, message: "The configuration is not signed.", keyPath: ""))
+                try dataOut.write(to: outputFile)
             }
-           
+            print("This configuration is \("prepared", effect: .green).")
+            results.forEach {
+                print("\($0.level.text) \($0.message) - \($0.keyPath, effect: .faint)")
+            }
         }
     }
 }

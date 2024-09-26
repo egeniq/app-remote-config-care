@@ -13,8 +13,9 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/egeniq/app-remote-config", from: "0.0.4"),
+        .package(url: "https://github.com/egeniq/app-remote-config", from: "0.4.0"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.0.0"),
+        .package(url: "https://github.com/jedisct1/swift-sodium.git", from: "0.9.1"),
         .package(url: "https://github.com/jpsim/Yams.git", from: "5.0.6")
     ],
     targets: [
@@ -22,8 +23,10 @@ let package = Package(
             name: "care",
             dependencies: [
                 .product(name: "AppRemoteConfig", package: "app-remote-config"),
-                .product(name: "Yams", package: "Yams"),
-                .product(name: "ArgumentParser", package: "swift-argument-parser")
+                .product(name: "SodiumClientLive", package: "app-remote-config"),
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "Sodium", package: "swift-sodium"),
+                .product(name: "Yams", package: "Yams")
             ]),
     ]
 )
