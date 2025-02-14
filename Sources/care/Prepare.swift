@@ -1,19 +1,17 @@
 import AppRemoteConfig
 import ArgumentParser
-import Dependencies
+import Crypto
 import Foundation
-import SodiumClient
 import Yams
 
 extension Care {
     struct Prepare: ParsableCommand {
-        static var configuration =
+        static let configuration =
             CommandConfiguration(abstract: "Prepare a configuration for publication.")
 
         @Option(
-            name: [.customShort("s"), .long],
-            help: "The secret key to use for signing the configuration.")
-        var secret: String?
+            help: "The base64 encoded private key to use for signing the configuration.")
+        var `private`: String?
         
         @Argument(
             help: "The file that contains the configuration.",
@@ -25,13 +23,12 @@ extension Care {
             completion: .file(extensions: ["json"]), transform: URL.init(fileURLWithPath:))
         var outputFile: URL
         
-        @MainActor
         mutating func run() throws {
             let data = try Data(contentsOf: inputFile)
-            var object: [String: Any]
+            var object: [String: Sendable]
             
             if let jsonObject = try? JSONSerialization.jsonObject(with: data, options: []) {
-                if let jsonDict = jsonObject as? [String: Any] {
+                if let jsonDict = jsonObject as? [String: Sendable] {
                     object = jsonDict
                 } else {
                     throw CareError.unexpectedData
@@ -39,7 +36,7 @@ extension Care {
             } else {
                 let string = String(data: data, encoding: .utf8)!
                 if let yamlObject = try? Yams.load(yaml: string) {
-                    if let yamlDict = yamlObject as? [String: Any] {
+                    if let yamlDict = yamlObject as? [String: Sendable] {
                         object = yamlDict
                     } else {
                         throw CareError.unexpectedData
@@ -50,13 +47,23 @@ extension Care {
             }
            
             let dataOut = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+            
             var results = [VerificationResult]()
-            if let secret {
-                @Dependency(\.sodiumClient) var sodiumClient
-                guard let signedData = sodiumClient.sign(message: dataOut, secretKey: secret) else {
-                    throw ConfigError.signingFailed
+            if let `private` {
+                guard let privateKeyData = Data(base64Encoded: `private`) else {
+                    throw CareError.invalidPrivateKey
                 }
-                try signedData.write(to: outputFile)
+                let privateKey = try Curve25519.Signing.PrivateKey(rawRepresentation: privateKeyData)
+                let encodedDataOut = dataOut.base64EncodedString()
+                let signature = try privateKey.signature(for: dataOut)
+                let signedDataOut = try JSONSerialization.data(
+                    withJSONObject: [
+                        Config.dataKey: encodedDataOut,
+                        Config.signatureKey: signature.base64EncodedString()
+                    ],
+                    options: [.sortedKeys]
+                )
+                try signedDataOut.write(to: outputFile)
             } else {
                 results.append(.init(level: .info, message: "The configuration is not signed.", keyPath: ""))
                 try dataOut.write(to: outputFile)

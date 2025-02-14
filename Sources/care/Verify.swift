@@ -1,14 +1,12 @@
 import AppRemoteConfig
 import ArgumentParser
-import Dependencies
+import Crypto
 import Foundation
-import SodiumClient
-import SodiumClientLive
 import Yams
 
 extension Care {
     struct Verify: ParsableCommand {
-        static var configuration =
+        static let configuration =
             CommandConfiguration(abstract: "Verify that the configuration is valid.")
 
         @Argument(
@@ -16,10 +14,9 @@ extension Care {
             completion: .file(extensions: ["yaml", "yml", "json"]), transform: URL.init(fileURLWithPath:))
         var inputFile: URL
         
-        @Option(help: "The public key used to sign the configuration.")
-        var publicKey: String?
-        
-        @MainActor
+        @Option(help: "The base64 encoded public key used to sign the configuration.")
+        var `public`: String? = nil
+
         mutating func run() throws {
             let data = try Data(contentsOf: inputFile)
             let results = try verify(from: data)
@@ -39,24 +36,31 @@ extension Care {
             }
         }
         
-        @MainActor
         func verify(from data: Data) throws -> [VerificationResult]  {
             var results = [VerificationResult]()
             
             let object: [String: Any]
             
-            if let publicKey {
-                @Dependency(SodiumClient.self) var sodiumClient
-                guard let config = sodiumClient.open(signedMessage: data, publicKey: publicKey) else {
-                    throw ConfigError.invalidSignature
+            if let `public` {
+                guard let publicKeyData = Data(base64Encoded: `public`) else {
+                    throw CareError.invalidPublicKey
                 }
-                let jsonObject = try JSONSerialization.jsonObject(with: config, options: [])
-                if let jsonDict = jsonObject as? [String: Any] {
-                    object = jsonDict
-                } else {
-                    results.append(.init(level: .error, message: "Expected a dictionary with string keys.", keyPath: "/"))
-                    return results
+                let publicKey = try Curve25519.Signing.PublicKey(rawRepresentation: publicKeyData)
+                guard
+                    let container = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+                    let encodedData = container[Config.dataKey] as? String,
+                    let decodedData = Data(base64Encoded: encodedData),
+                    let signature = container[Config.signatureKey] as? String,
+                    let signatureData = Data(base64Encoded: signature) else {
+                    throw CareError.unexpectedData
                 }
+                guard publicKey.isValidSignature(signatureData, for: decodedData) else {
+                    throw CareError.invalidSignature
+                }
+                guard let jsonObject = try JSONSerialization.jsonObject(with: decodedData, options: []) as? [String: Any] else {
+                    throw CareError.unexpectedData
+                } 
+                object = jsonObject
             } else if let jsonObject = try? JSONSerialization.jsonObject(with: data, options: []) {
                 if let jsonDict = jsonObject as? [String: Any] {
                     object = jsonDict
@@ -81,6 +85,11 @@ extension Care {
             }
             
             var configKeys: [String] = []
+            if `public` == nil && object.keys.contains(Config.dataKey) &&  object.keys.contains(Config.signatureKey) {
+                results.append(.init(level: .error, message: "This configuration is signed. Provide the public key.", keyPath: "/"))
+                return results
+            }
+            
             if let settings = object["settings"] {
                 let keyPath = "/settings"
                 if let settings = settings as? [String: Any]  {

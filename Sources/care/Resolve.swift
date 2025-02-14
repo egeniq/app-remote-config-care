@@ -2,10 +2,11 @@ import AppRemoteConfig
 import ArgumentParser
 import Foundation
 import Yams
+import Crypto
 
 extension Care {
     struct Resolve: ParsableCommand {
-        static var configuration =
+        static let configuration =
             CommandConfiguration(abstract: "Resolve a configuration for an app to verify output.")
 
         @Argument(
@@ -45,28 +46,31 @@ extension Care {
         @Option(help: "The 2 character code of the language the app runs in.")
         var language: String?
         
-        @Option(help: "The public key used to sign the configuration.")
-        var publicKey: String?
+        @Option(help: "The base64 encoded public key used to sign the configuration.")
+        var `public`: String?
         
-        @MainActor
         mutating func run() throws {
             let data = try Data(contentsOf: inputFile)
             let config: Config
            
             if let _ = try? JSONSerialization.jsonObject(with: data, options: []) {
-                if let publicKey {
-                    config = try Config(data: data, publicKey: publicKey)
+                if let `public` {
+                    guard let publicKeyData = Data(base64Encoded: `public`) else {
+                        throw CareError.invalidPublicKey
+                    }
+                    let key = try Curve25519.Signing.PublicKey(rawRepresentation: publicKeyData)
+                    config = try Config(data: data, publicKey: key)
                 } else {
                     config = try Config(data: data)
                 }
             } else {
-                if publicKey != nil {
+                if `public` != nil {
                     print("\("[WARNING]", effect: .yellow) Config is not signed, but a public key was provided.")
                 }
-                var object: [String: Any]
+                var object: [String: Sendable]
                 let string = String(data: data, encoding: .utf8)!
                 if let yamlObject = try? Yams.load(yaml: string) {
-                    if let yamlDict = yamlObject as? [String: Any] {
+                    if let yamlDict = yamlObject as? [String: Sendable] {
                         object = yamlDict
                     } else {
                         throw CareError.unexpectedData
@@ -147,5 +151,5 @@ extension Care {
     }
 }
 
-extension BuildVariant: ExpressibleByArgument { }
-extension Platform: ExpressibleByArgument { }
+extension BuildVariant: @retroactive ExpressibleByArgument { }
+extension Platform: @retroactive ExpressibleByArgument { }

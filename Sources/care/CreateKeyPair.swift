@@ -1,25 +1,21 @@
 import AppRemoteConfig
 import ArgumentParser
-import Dependencies
+import Crypto
 import Foundation
-import SodiumClient
 
 extension Care {
     struct CreateKeyPair: ParsableCommand {
-        static var configuration =
+        static let configuration =
             CommandConfiguration(abstract: "Prepare a new key pair for signing a config.")
         
         mutating func run() throws {
-            @Dependency(\.sodiumClient) var sodiumClient
-            guard let keyPair = sodiumClient.keyPair() else {
-                return
-            }
+            let privateKey = Curve25519.Signing.PrivateKey()
             
-            let publicKey = keyPair.publicKey
-            print("The \("public", effect: .bold) key is \"\(publicKey, effect: .blue)\".")
+            let publicKeyString = privateKey.publicKey.rawRepresentation.base64EncodedString()
+            print("The \("public", effect: .bold) key is \"\(publicKeyString, effect: .blue)\"")
             
-            let secretKey = keyPair.secretKey
-            print("The \("secret", effect: .bold) key is \"\(secretKey, effect: .yellow)\".")
+            let privateKeyString = privateKey.rawRepresentation.base64EncodedString()
+            print("The \("private", effect: .bold) key is \"\(privateKeyString, effect: .yellow)\"")
         }
     }
 }

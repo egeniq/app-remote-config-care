@@ -22,7 +22,7 @@ The "care" command line utility has built-in help available.
 
     care --help
    
-There are four subcommands to use: init, verify, resolve and prepare.
+There are five subcommands to use: init, create-key-pair, verify, resolve and prepare.
 
 ### Init
 
@@ -77,6 +77,12 @@ In `overrides` you can define settings that vary on a number of factors such as 
 You can also schedule changes in settings. If you add a `schedule` with `from` and/or `until` ISO8601 dates settings will only be applied if the current time lies with the range. Omitting `from` means using the distant past, and omitting `to` means using the distant future.
 
 The keys under `meta` are not used, but only exist to keep track of metadata.
+
+### Create Key Pair
+
+Your app can use a public key to ensure that the configuration was signed with your private key. Signing the configuration is optional.
+
+    care create-key-pair
 
 ### Verify
 
